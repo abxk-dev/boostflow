@@ -325,7 +325,7 @@ export default function HomePage() {
         <div className="absolute top-1/4 -left-32 w-[500px] h-[500px] rounded-full bg-violet-600/10 blur-[120px] pointer-events-none" />
         <div className="absolute bottom-1/4 -right-32 w-[400px] h-[400px] rounded-full bg-cyan-500/10 blur-[100px] pointer-events-none" />
 
-        <div className="container relative px-4 md:px-6">
+        <div className="container mx-auto relative px-4 md:px-6">
           <div className="text-center mb-16">
             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-violet-500/10 border border-violet-500/20 text-violet-400 text-xs font-medium mb-6">
               <span className="text-[10px] text-gray-500 uppercase tracking-widest">01</span>
@@ -486,7 +486,7 @@ export default function HomePage() {
         <div className="absolute top-1/4 left-0 w-[400px] h-[400px] rounded-full bg-pink-500/5 blur-[100px] pointer-events-none" />
         <div className="absolute bottom-1/4 right-0 w-[400px] h-[400px] rounded-full bg-blue-500/5 blur-[100px] pointer-events-none" />
 
-        <div className="container relative px-4 md:px-6">
+        <div className="container mx-auto relative px-4 md:px-6">
           <ScrollReveal animation="fade-up" className="text-center mb-16">
             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-pink-500/10 border border-pink-500/20 text-pink-400 text-xs font-medium mb-6">
               <span className="text-[10px] text-gray-500 uppercase tracking-widest">02</span>
@@ -535,7 +535,7 @@ export default function HomePage() {
       <section id="growth" className="py-24 relative overflow-hidden">
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[400px] rounded-full bg-violet-600/10 blur-[120px] pointer-events-none" />
 
-        <div className="container relative px-4 md:px-6">
+        <div className="container mx-auto relative px-4 md:px-6">
           <ScrollReveal animation="fade-up" className="text-center mb-16">
             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-violet-500/10 border border-violet-500/20 text-violet-400 text-xs font-medium mb-6">
               <span className="text-[10px] text-gray-500 uppercase tracking-widest">03</span>
@@ -621,7 +621,7 @@ export default function HomePage() {
         <div className="absolute inset-0 bg-[#0D0D14]" />
         <div className="absolute top-1/3 right-0 w-[500px] h-[500px] rounded-full bg-emerald-500/5 blur-[120px] pointer-events-none" />
 
-        <div className="container relative px-4 md:px-6">
+        <div className="container mx-auto relative px-4 md:px-6">
           <ScrollReveal animation="fade-up" className="text-center mb-16">
             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-medium mb-6">
               <span className="text-[10px] text-gray-500 uppercase tracking-widest">04</span>
@@ -702,7 +702,7 @@ export default function HomePage() {
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[300px] rounded-full bg-violet-600/15 blur-[100px] pointer-events-none" />
         <div className="absolute top-1/3 left-1/4 w-[300px] h-[300px] rounded-full bg-cyan-500/10 blur-[80px] pointer-events-none" />
 
-        <div className="container relative px-4 md:px-6">
+        <div className="container mx-auto relative px-4 md:px-6">
           <ScrollReveal animation="scale" delay={100}>
             <div className="max-w-4xl mx-auto">
               <div className="relative rounded-3xl overflow-hidden border border-white/5 bg-gradient-to-br from-violet-600/10 via-[#0D0D14] to-cyan-600/10 p-10 md:p-16 text-center">
