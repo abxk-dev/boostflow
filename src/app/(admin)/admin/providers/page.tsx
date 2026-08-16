@@ -364,9 +364,14 @@ export default function AdminProvidersPage() {
                         {provider.timeoutMs}ms / {provider.maxRetries} retries
                       </td>
                       <td className="p-4">
-                        <Badge variant={provider.isActive ? "success" : "destructive"}>
-                          {provider.isActive ? "Active" : "Inactive"}
-                        </Badge>
+                        <div className="flex flex-col gap-1">
+                          <Badge variant={provider.isActive ? "success" : "destructive"}>
+                            {provider.isActive ? "Active" : "Inactive"}
+                          </Badge>
+                          {(!provider.apiKey || provider.apiKey === "REPLACE_WITH_YOUR_KEY") && (
+                            <span className="text-xs text-red-500 font-medium">⚠ API key not set</span>
+                          )}
+                        </div>
                       </td>
                       <td className="p-4">
                         <div className="flex gap-2">

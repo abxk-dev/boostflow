@@ -38,6 +38,7 @@ interface Order {
 export default function AdminOrdersPage() {
   const [orders, setOrders] = useState<Order[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [statusFilter, setStatusFilter] = useState<string>("all")
@@ -47,6 +48,7 @@ export default function AdminOrdersPage() {
   useEffect(() => {
     async function fetchOrders() {
       setIsLoading(true)
+      setError(null)
       try {
         const params = new URLSearchParams({
           page: page.toString(),
@@ -61,9 +63,12 @@ export default function AdminOrdersPage() {
         if (data.success) {
           setOrders(data.data.orders)
           setTotalPages(data.data.pagination.pages)
+        } else {
+          setError(data.error || "Failed to load orders")
         }
-      } catch (error) {
-        console.error("Failed to fetch orders:", error)
+      } catch (err) {
+        console.error("Failed to fetch orders:", err)
+        setError("Network error — check your connection")
       } finally {
         setIsLoading(false)
       }
@@ -89,10 +94,41 @@ export default function AdminOrdersPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Orders</h1>
-        <p className="text-muted-foreground">Manage and monitor all orders</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold">Orders</h1>
+          <p className="text-muted-foreground">Manage and monitor all orders</p>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            setIsLoading(true)
+            setError(null)
+            const params = new URLSearchParams({ page: page.toString(), limit: "20" })
+            if (statusFilter !== "all") params.set("status", statusFilter)
+            if (search) params.set("search", search)
+            fetch(`/api/admin/orders?${params}`)
+              .then((r) => r.json())
+              .then((data) => {
+                if (data.success) {
+                  setOrders(data.data.orders)
+                  setTotalPages(data.data.pagination.pages)
+                }
+              })
+              .catch(() => {})
+              .finally(() => setIsLoading(false))
+          }}
+        >
+          Refresh
+        </Button>
       </div>
+
+      {error && (
+        <div className="p-4 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+          {error}
+        </div>
+      )}
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-4">

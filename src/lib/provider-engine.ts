@@ -64,6 +64,13 @@ export async function dispatchOrder(
 
     if (!provider || !provider.isActive) continue
 
+    // Check if API key is configured
+    if (!provider.apiKey || provider.apiKey === "REPLACE_WITH_YOUR_KEY") {
+      lastError = `Provider "${provider.name}" API key not configured. Please set it in Admin → Providers.`
+      await logEvent("error", "provider-engine", lastError, { providerId: provider._id })
+      continue
+    }
+
     // Decrypt API key
     let apiKey: string
     try {
