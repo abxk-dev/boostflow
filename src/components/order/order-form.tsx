@@ -293,29 +293,43 @@ export function OrderForm() {
     setError(null)
 
     try {
-      // Trigger Adexium rewarded ad if available
-      const adToken = await new Promise<string>((resolve, reject) => {
-        const timeout = setTimeout(() => {
-          reject(new Error("Ad timed out. Please try again."))
-        }, 60000)
+      // Generate unique click ID for this ad view
+      const clickId = uuidv4()
+      const adUrl = `https://get.atechspace.live/dl/375b4fb3-c381-44a8-aaf8-36a65bd31675?placement=boostflow&axm_ext_clk_id=${clickId}`
 
-        // Check for Adexium widget reward callback
-        const w = window as any
-        if (w.AdexiumWidget && w.__adexiumInstance) {
-          // Adexium autoMode handles the ad — listen for reward
-          w.__adexiumReward = (token: string) => {
-            clearTimeout(timeout)
-            resolve(token || `adex-${Date.now()}`)
-          }
-          // Trigger a new ad impression
-          w.__adexiumInstance.showAd?.() || w.__adexiumInstance.triggerAd?.()
-        } else {
-          // Fallback: simulate ad completion for development
-          clearTimeout(timeout)
+      // Open ad in new tab
+      const adWindow = window.open(adUrl, "_blank")
+
+      // Wait for user to return to this tab (they watched the ad)
+      await new Promise<void>((resolve) => {
+        const onFocus = () => {
+          if (document.hidden) return
+          // Give a small delay after focus to ensure ad completion is tracked
           setTimeout(() => {
-            resolve(`adex-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+            window.removeEventListener("visibilitychange", onFocus)
+            window.removeEventListener("focus", onFocus)
+            resolve()
           }, 2000)
         }
+
+        window.addEventListener("visibilitychange", onFocus)
+        window.addEventListener("focus", onFocus)
+
+        // If popup was blocked or closed immediately, resolve after delay
+        if (!adWindow || adWindow.closed) {
+          setTimeout(() => {
+            window.removeEventListener("visibilitychange", onFocus)
+            window.removeEventListener("focus", onFocus)
+            resolve()
+          }, 5000)
+        }
+
+        // Safety timeout — don't wait forever
+        setTimeout(() => {
+          window.removeEventListener("visibilitychange", onFocus)
+          window.removeEventListener("focus", onFocus)
+          resolve()
+        }, 120000)
       })
 
       // Call backend to verify ad completion
@@ -324,7 +338,7 @@ export function OrderForm() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           platform: selectedPlatform,
-          adNetworkToken: adToken,
+          adNetworkToken: `adex-${clickId}`,
         }),
       })
 
@@ -814,7 +828,7 @@ export function OrderForm() {
             <p className="text-gray-400 mb-8 max-w-sm mx-auto">
               {adCompleted
                 ? "Your Submit button is now unlocked. You can place your order."
-                : "Watch a short ad to unlock the Submit button. This keeps the service free."}
+                : "Click below to open a short ad in a new tab. Come back here after to submit your order."}
             </p>
 
             {!adCompleted ? (
@@ -849,12 +863,12 @@ export function OrderForm() {
                   {adWatching ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Verifying...
+                      Waiting for ad...
                     </>
                   ) : (
                     <>
                       <Play className="mr-2 h-4 w-4" />
-                      Watch Ad
+                      Open Ad & Unlock
                     </>
                   )}
                 </Button>
