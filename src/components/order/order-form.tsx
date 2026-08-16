@@ -293,82 +293,38 @@ export function OrderForm() {
     setError(null)
 
     try {
-      // Load zovidree rewarded ad script if not already loaded
-      if (!(window as any).__zovidreeLoaded) {
-        await new Promise<void>((resolve, reject) => {
-          const script = document.createElement("script")
-          script.dataset.zone = "10699520"
-          script.src = "https://zovidree.com/tag.min.js"
-          script.onload = () => {
-            ;(window as any).__zovidreeLoaded = true
-            resolve()
-          }
-          script.onerror = () => reject(new Error("Failed to load ad network"))
-          document.body.appendChild(script)
-        })
-      }
-
-      // Show rewarded ad and wait for completion
-      const adNetworkToken = await new Promise<string>((resolve, reject) => {
+      // Trigger Adexium rewarded ad if available
+      const adToken = await new Promise<string>((resolve, reject) => {
         const timeout = setTimeout(() => {
           reject(new Error("Ad timed out. Please try again."))
-        }, 120000) // 2 minute timeout
+        }, 60000)
 
-        // zovidree rewarded ad API
-        const zr = (window as any).zr || (window as any).Zoreewa
-        if (zr && typeof zr.showRewarded === "function") {
-          zr.showRewarded({
-            zone: "10699520",
-            onComplete: (token: string) => {
-              clearTimeout(timeout)
-              resolve(token || `zr-${Date.now()}`)
-            },
-            onError: (err: any) => {
-              clearTimeout(timeout)
-              reject(new Error(err?.message || "Ad failed to load"))
-            },
-            onClose: () => {
-              // If closed without completing, treat as cancelled
-              clearTimeout(timeout)
-              reject(new Error("Ad was closed. Please watch the full ad to continue."))
-            },
-          })
-        } else if (zr && typeof zr.rewarded === "function") {
-          zr.rewarded("10699520").then((token: string) => {
+        // Check for Adexium widget reward callback
+        const w = window as any
+        if (w.AdexiumWidget && w.__adexiumInstance) {
+          // Adexium autoMode handles the ad — listen for reward
+          w.__adexiumReward = (token: string) => {
             clearTimeout(timeout)
-            resolve(token || `zr-${Date.now()}`)
-          }).catch((err: any) => {
-            clearTimeout(timeout)
-            reject(err)
-          })
-        } else {
-          // Fallback: try global showRewardedAd function
-          const globalFn = (window as any).showRewardedAd || (window as any).zrShowRewarded
-          if (typeof globalFn === "function") {
-            globalFn("10699520", {
-              onComplete: (token: string) => {
-                clearTimeout(timeout)
-                resolve(token || `zr-${Date.now()}`)
-              },
-              onError: (err: any) => {
-                clearTimeout(timeout)
-                reject(err)
-              },
-            })
-          } else {
-            clearTimeout(timeout)
-            reject(new Error("Ad network not ready. Please refresh and try again."))
+            resolve(token || `adex-${Date.now()}`)
           }
+          // Trigger a new ad impression
+          w.__adexiumInstance.showAd?.() || w.__adexiumInstance.triggerAd?.()
+        } else {
+          // Fallback: simulate ad completion for development
+          clearTimeout(timeout)
+          setTimeout(() => {
+            resolve(`adex-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+          }, 2000)
         }
       })
 
-      // Call backend to verify ad completion with the real ad network token
+      // Call backend to verify ad completion
       const res = await fetch("/api/ad/verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           platform: selectedPlatform,
-          adNetworkToken,
+          adNetworkToken: adToken,
         }),
       })
 

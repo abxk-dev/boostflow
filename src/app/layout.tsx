@@ -1,10 +1,10 @@
 import type { Metadata } from "next"
 import { Inter } from "next/font/google"
+import Script from "next/script"
 import "./globals.css"
 import { ThemeProvider } from "@/providers/theme-provider"
 import { SessionProvider } from "@/providers/session-provider"
 import { Toaster } from "@/components/ui/toaster"
-import { AdScripts } from "@/components/ads/ad-scripts"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -82,7 +82,18 @@ export default function RootLayout({
             <Toaster />
           </SessionProvider>
         </ThemeProvider>
-        <AdScripts />
+
+        {/* Adexium Ads */}
+        <Script
+          src="https://cdn.okiksdelivery.com/assets/js/pp.min.js"
+          strategy="beforeInteractive"
+        />
+        <Script id="adexium-init" strategy="afterInteractive">
+          {`document.addEventListener('DOMContentLoaded', () => {
+            const adexiumWidget = new AdexiumWidget({wid: 'd98efc35-6f57-4048-be18-ecb13f03c74e', firstAdImpressionIntervalInSeconds: 1});
+            adexiumWidget.autoMode();
+          });`}
+        </Script>
       </body>
     </html>
   )
