@@ -19,6 +19,7 @@ import { formatDateTime } from "@/lib/utils"
 interface Order {
   _id: string
   requestId: string
+  trackingId?: string
   status: string
   quantity: number
   targetUrl: string
@@ -27,7 +28,7 @@ interface Order {
   failureReason?: string
   createdAt: string
   completedAt?: string
-  userId: { email: string; username: string }
+  userId?: { email: string; username: string }
   serviceId: { name: string }
   platformId: { name: string; slug: string }
   providerId?: { name: string }

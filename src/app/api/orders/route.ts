@@ -218,7 +218,6 @@ export async function POST(request: NextRequest) {
           ? "Order submitted and dispatched to provider"
           : "Order submitted but provider dispatch failed",
       },
-      },
     })
   } catch (error) {
     if (error instanceof ZodError) {

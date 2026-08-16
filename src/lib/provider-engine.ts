@@ -57,6 +57,7 @@ export async function dispatchOrder(
       name: string
       apiUrl: string
       apiKey: string
+      isActive: boolean
       timeoutMs: number
       maxRetries: number
     }
