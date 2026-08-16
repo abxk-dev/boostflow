@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import mongoose from "mongoose"
 import { connectDB } from "@/lib/db"
 import {
   Order,
@@ -50,6 +51,13 @@ export async function POST(request: NextRequest) {
     if (!requestId || !verificationId || !serviceId || !targetUrl || !quantity) {
       return NextResponse.json(
         { success: false, error: "Missing required fields" },
+        { status: 400 }
+      )
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(serviceId)) {
+      return NextResponse.json(
+        { success: false, error: "Invalid service ID" },
         { status: 400 }
       )
     }

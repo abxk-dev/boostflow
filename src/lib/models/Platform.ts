@@ -37,7 +37,7 @@ const PlatformSchema = new Schema<IPlatform>(
   }
 )
 
-PlatformSchema.index({ slug: 1 }, { unique: true })
+// Additional indexes (slug unique index already defined in schema)
 PlatformSchema.index({ isActive: 1, sortOrder: 1 })
 
 const Platform: Model<IPlatform> =

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import mongoose from "mongoose"
 import { connectDB } from "@/lib/db"
 import { Cooldown } from "@/lib/models"
 import { parseSocialUrl } from "@/lib/url-parser"
@@ -24,6 +25,13 @@ export async function POST(request: NextRequest) {
     if (!url || !platform || !serviceId) {
       return NextResponse.json(
         { success: false, error: "Missing required fields" },
+        { status: 400 }
+      )
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(serviceId)) {
+      return NextResponse.json(
+        { success: false, error: "Invalid service ID" },
         { status: 400 }
       )
     }

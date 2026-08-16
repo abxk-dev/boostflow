@@ -32,7 +32,6 @@ const RateLimitSchema = new Schema<IRateLimit>(
 )
 
 RateLimitSchema.index({ key: 1, endpoint: 1 })
-RateLimitSchema.index({ windowEnd: 1 }, { expireAfterSeconds: 0 })
 
 const RateLimit: Model<IRateLimit> =
   mongoose.models.RateLimit || mongoose.model<IRateLimit>("RateLimit", RateLimitSchema)

@@ -58,7 +58,7 @@ CooldownSchema.index(
   { name: "account_cooldown" }
 )
 
-CooldownSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 })
+// TTL index already defined via `index: { expires: 0 }` on the expiresAt field
 
 const Cooldown: Model<ICooldown> =
   mongoose.models.Cooldown || mongoose.model<ICooldown>("Cooldown", CooldownSchema)

@@ -110,9 +110,7 @@ const OrderSchema = new Schema<IOrder>(
   }
 )
 
-// Required indexes
-OrderSchema.index({ requestId: 1 }, { unique: true })
-OrderSchema.index({ trackingId: 1 }, { unique: true, sparse: true })
+// Additional indexes (requestId and trackingId unique indexes already defined in schema)
 OrderSchema.index({ userId: 1, createdAt: -1 }, { sparse: true })
 OrderSchema.index({ status: 1 })
 OrderSchema.index({ createdAt: -1 })

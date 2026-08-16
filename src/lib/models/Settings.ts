@@ -27,7 +27,7 @@ const SettingsSchema = new Schema<ISettings>(
   }
 )
 
-SettingsSchema.index({ key: 1 }, { unique: true })
+// Index already defined via `unique: true` on the key field
 
 const Settings: Model<ISettings> =
   mongoose.models.Settings || mongoose.model<ISettings>("Settings", SettingsSchema)

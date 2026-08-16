@@ -55,9 +55,7 @@ const AdVerificationSchema = new Schema<IAdVerification>(
   }
 )
 
-AdVerificationSchema.index({ verificationId: 1 }, { unique: true })
 AdVerificationSchema.index({ identifier: 1, platformSlug: 1, isUsed: 1 })
-AdVerificationSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 })
 
 const AdVerification: Model<IAdVerification> =
   mongoose.models.AdVerification ||

@@ -50,10 +50,8 @@ const AdRewardSchema = new Schema<IAdReward>(
   }
 )
 
-// Required indexes
-AdRewardSchema.index({ rewardToken: 1 }, { unique: true })
+// Additional indexes (rewardToken and expiresAt indexes already defined in schema)
 AdRewardSchema.index({ userId: 1, serviceId: 1 })
-AdRewardSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 })
 
 const AdReward: Model<IAdReward> =
   mongoose.models.AdReward || mongoose.model<IAdReward>("AdReward", AdRewardSchema)

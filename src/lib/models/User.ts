@@ -53,9 +53,7 @@ const UserSchema = new Schema<IUser>(
   }
 )
 
-// Indexes
-UserSchema.index({ email: 1 }, { unique: true })
-UserSchema.index({ username: 1 }, { unique: true })
+// Additional indexes (email and username unique indexes already defined in schema)
 UserSchema.index({ createdAt: -1 })
 
 const User: Model<IUser> = mongoose.models.User || mongoose.model<IUser>("User", UserSchema)
