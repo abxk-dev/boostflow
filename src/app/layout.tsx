@@ -5,6 +5,7 @@ import "./globals.css"
 import { ThemeProvider } from "@/providers/theme-provider"
 import { SessionProvider } from "@/providers/session-provider"
 import { Toaster } from "@/components/ui/toaster"
+import { UserAds } from "@/components/ads/user-ads"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -82,6 +83,9 @@ export default function RootLayout({
             <Toaster />
           </SessionProvider>
         </ThemeProvider>
+
+        {/* User-side ads (push notifications + vignette banner) — skipped on admin pages */}
+        <UserAds />
 
         {/* Adexium Ads */}
         <Script
