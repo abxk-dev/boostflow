@@ -4,6 +4,7 @@ import "./globals.css"
 import { ThemeProvider } from "@/providers/theme-provider"
 import { SessionProvider } from "@/providers/session-provider"
 import { Toaster } from "@/components/ui/toaster"
+import { AdScripts } from "@/components/ads/ad-scripts"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -81,6 +82,7 @@ export default function RootLayout({
             <Toaster />
           </SessionProvider>
         </ThemeProvider>
+        <AdScripts />
       </body>
     </html>
   )

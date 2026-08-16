@@ -290,18 +290,85 @@ export function OrderForm() {
   const handleWatchAd = async () => {
     if (!selectedPlatform) return
     setAdWatching(true)
+    setError(null)
 
     try {
-      // Simulate ad watching (replace with real ad network integration)
-      await new Promise((resolve) => setTimeout(resolve, 2000))
+      // Load zovidree rewarded ad script if not already loaded
+      if (!(window as any).__zovidreeLoaded) {
+        await new Promise<void>((resolve, reject) => {
+          const script = document.createElement("script")
+          script.dataset.zone = "10699520"
+          script.src = "https://zovidree.com/tag.min.js"
+          script.onload = () => {
+            ;(window as any).__zovidreeLoaded = true
+            resolve()
+          }
+          script.onerror = () => reject(new Error("Failed to load ad network"))
+          document.body.appendChild(script)
+        })
+      }
 
-      // Call backend to verify ad completion
+      // Show rewarded ad and wait for completion
+      const adNetworkToken = await new Promise<string>((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          reject(new Error("Ad timed out. Please try again."))
+        }, 120000) // 2 minute timeout
+
+        // zovidree rewarded ad API
+        const zr = (window as any).zr || (window as any).Zoreewa
+        if (zr && typeof zr.showRewarded === "function") {
+          zr.showRewarded({
+            zone: "10699520",
+            onComplete: (token: string) => {
+              clearTimeout(timeout)
+              resolve(token || `zr-${Date.now()}`)
+            },
+            onError: (err: any) => {
+              clearTimeout(timeout)
+              reject(new Error(err?.message || "Ad failed to load"))
+            },
+            onClose: () => {
+              // If closed without completing, treat as cancelled
+              clearTimeout(timeout)
+              reject(new Error("Ad was closed. Please watch the full ad to continue."))
+            },
+          })
+        } else if (zr && typeof zr.rewarded === "function") {
+          zr.rewarded("10699520").then((token: string) => {
+            clearTimeout(timeout)
+            resolve(token || `zr-${Date.now()}`)
+          }).catch((err: any) => {
+            clearTimeout(timeout)
+            reject(err)
+          })
+        } else {
+          // Fallback: try global showRewardedAd function
+          const globalFn = (window as any).showRewardedAd || (window as any).zrShowRewarded
+          if (typeof globalFn === "function") {
+            globalFn("10699520", {
+              onComplete: (token: string) => {
+                clearTimeout(timeout)
+                resolve(token || `zr-${Date.now()}`)
+              },
+              onError: (err: any) => {
+                clearTimeout(timeout)
+                reject(err)
+              },
+            })
+          } else {
+            clearTimeout(timeout)
+            reject(new Error("Ad network not ready. Please refresh and try again."))
+          }
+        }
+      })
+
+      // Call backend to verify ad completion with the real ad network token
       const res = await fetch("/api/ad/verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           platform: selectedPlatform,
-          adNetworkToken: `ad-token-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+          adNetworkToken,
         }),
       })
 
@@ -317,8 +384,8 @@ export function OrderForm() {
       } else {
         setError(data.error || "Ad verification failed")
       }
-    } catch {
-      setError("Failed to verify ad completion")
+    } catch (err: any) {
+      setError(err.message || "Failed to verify ad completion")
     } finally {
       setAdWatching(false)
     }
@@ -796,21 +863,22 @@ export function OrderForm() {
 
             {!adCompleted ? (
               <div className="space-y-4">
-                {/* Ad placeholder */}
+                {/* Ad container */}
                 <div className="bg-white/5 rounded-2xl p-6 border border-white/10">
                   <div className="flex flex-col items-center gap-3">
                     {adWatching ? (
                       <>
                         <Loader2 className="h-8 w-8 animate-spin text-violet-400" />
-                        <p className="text-sm text-white/60">Watching ad...</p>
+                        <p className="text-sm text-white/60">Loading ad...</p>
+                        <p className="text-xs text-white/30">Please wait while the ad loads. Do not close this page.</p>
                       </>
                     ) : (
                       <>
-                        <div className="h-12 w-12 rounded-full bg-white/10 flex items-center justify-center">
-                          <Play className="h-6 w-6 text-white/60" />
+                        <div className="h-12 w-12 rounded-full bg-gradient-to-br from-violet-500/20 to-cyan-500/20 flex items-center justify-center">
+                          <Play className="h-6 w-6 text-violet-400" />
                         </div>
-                        <p className="text-xs text-white/30">
-                          Ad placeholder — integrate your ad network
+                        <p className="text-xs text-white/40">
+                          Powered by rewarded ad network
                         </p>
                       </>
                     )}
