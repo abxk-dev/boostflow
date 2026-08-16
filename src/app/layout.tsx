@@ -84,20 +84,29 @@ export default function RootLayout({
           </SessionProvider>
         </ThemeProvider>
 
-        {/* User-side ads (push notifications + vignette banner) — skipped on admin pages */}
-        <UserAds />
-
-        {/* Adexium Ads */}
+        {/* Adexium Ads — loaded early */}
         <Script
           src="https://cdn.okiksdelivery.com/assets/js/pp.min.js"
           strategy="beforeInteractive"
         />
-        <Script id="adexium-init" strategy="afterInteractive">
-          {`document.addEventListener('DOMContentLoaded', () => {
-            const adexiumWidget = new AdexiumWidget({wid: 'd98efc35-6f57-4048-be18-ecb13f03c74e', firstAdImpressionIntervalInSeconds: 1});
-            adexiumWidget.autoMode();
-          });`}
+        <Script id="adexium-init" strategy="beforeInteractive">
+          {`(function() {
+            function initAdexium() {
+              if (typeof AdexiumWidget !== 'undefined') {
+                var widget = new AdexiumWidget({wid: 'd98efc35-6f57-4048-be18-ecb13f03c74e', firstAdImpressionIntervalInSeconds: 1});
+                widget.autoMode();
+              }
+            }
+            if (document.readyState === 'loading') {
+              document.addEventListener('DOMContentLoaded', initAdexium);
+            } else {
+              initAdexium();
+            }
+          })();`}
         </Script>
+
+        {/* User-side ads (push notifications + vignette + wpadmngr) — skipped on admin pages */}
+        <UserAds />
       </body>
     </html>
   )
