@@ -44,8 +44,10 @@ interface OrderStatus {
 
 const statusConfig: Record<string, { label: string; color: string; icon: typeof CheckCircle }> = {
   ORDER_QUEUED: { label: "Queued", color: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30", icon: Clock },
+  PROVIDER_DISPATCHED: { label: "Dispatched", color: "bg-blue-500/20 text-blue-400 border-blue-500/30", icon: Zap },
   PROCESSING: { label: "Processing", color: "bg-blue-500/20 text-blue-400 border-blue-500/30", icon: Loader2 },
   IN_PROGRESS: { label: "In Progress", color: "bg-violet-500/20 text-violet-400 border-violet-500/30", icon: Zap },
+  DELIVERED: { label: "Delivered", color: "bg-green-500/20 text-green-400 border-green-500/30", icon: CheckCircle },
   COMPLETED: { label: "Completed", color: "bg-green-500/20 text-green-400 border-green-500/30", icon: CheckCircle },
   FAILED: { label: "Failed", color: "bg-red-500/20 text-red-400 border-red-500/30", icon: AlertCircle },
   CANCELLED: { label: "Cancelled", color: "bg-gray-500/20 text-gray-400 border-gray-500/30", icon: AlertCircle },
@@ -209,18 +211,19 @@ export default function TrackPage() {
                       style={{
                         width: `${
                           order.status === "ORDER_QUEUED" ? "0%" :
-                          order.status === "PROCESSING" ? "33%" :
-                          order.status === "IN_PROGRESS" ? "66%" :
+                          order.status === "PROVIDER_DISPATCHED" ? "25%" :
+                          order.status === "PROCESSING" ? "50%" :
+                          order.status === "IN_PROGRESS" ? "75%" :
                           "100%"
                         }`,
                       }}
                     />
 
                     <div className="relative flex items-start justify-between">
-                      {["ORDER_QUEUED", "PROCESSING", "IN_PROGRESS", "COMPLETED"].map((status, i) => {
+                      {["ORDER_QUEUED", "PROVIDER_DISPATCHED", "IN_PROGRESS", "COMPLETED"].map((status, i) => {
                         const config = getStatusConfig(status)
                         const isActive = order.status === status
-                        const isPast = ["ORDER_QUEUED", "PROCESSING", "IN_PROGRESS", "COMPLETED"].indexOf(order.status) > i
+                        const isPast = ["ORDER_QUEUED", "PROVIDER_DISPATCHED", "IN_PROGRESS", "COMPLETED"].indexOf(order.status) > i
 
                         return (
                           <div key={status} className="flex flex-col items-center" style={{ width: "25%" }}>

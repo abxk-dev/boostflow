@@ -15,8 +15,7 @@ import { validateUrlForPlatform } from "@/lib/validations"
 import { QUANTITY_LEVELS } from "@/types"
 import { parseSocialUrl } from "@/lib/url-parser"
 import { v4 as uuidv4 } from "uuid"
-import { SMMPanel } from "@/lib/smm-panel"
-import { decrypt } from "@/lib/crypto"
+import { dispatchOrder } from "@/lib/provider-engine"
 
 const COOLDOWN_HOURS = 3
 const COOLDOWN_MS = COOLDOWN_HOURS * 60 * 60 * 1000
@@ -221,15 +220,22 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // 9. Generate tracking ID
+    // 9. Find provider service mapping to get price info
+    const providerService = await ProviderService.findOne({
+      serviceId: service._id,
+      isActive: true,
+    }).populate("providerId")
+
+    // 10. Generate tracking ID
     const trackingId = `BF-${uuidv4().slice(0, 8).toUpperCase()}`
 
-    // 10. Mark ad verification as used
+    // 11. Mark ad verification as used
     adVerification.isUsed = true
     adVerification.usedAt = now
+    adVerification.orderId = undefined // will be set after order creation
     await adVerification.save()
 
-    // 11. Create order
+    // 12. Create order in database FIRST (before provider call)
     const order = await Order.create({
       requestId,
       trackingId,
@@ -243,10 +249,13 @@ export async function POST(request: NextRequest) {
       ip,
     })
 
-    // 12. Create cooldown records
+    // Update ad verification with order reference
+    adVerification.orderId = order._id
+    await adVerification.save()
+
+    // 13. Create cooldown records
     const expiresAt = new Date(now.getTime() + COOLDOWN_MS)
 
-    // Content-level cooldown
     await Cooldown.create({
       identifier,
       platformSlug: platform.slug,
@@ -256,7 +265,7 @@ export async function POST(request: NextRequest) {
       expiresAt,
     })
 
-    // 13. Update quantity unlock progress
+    // 14. Update quantity unlock progress
     if (!unlock) {
       const nextLevelConfig = QUANTITY_LEVELS.find((l) => l.level === 2)
       await QuantityUnlock.create({
@@ -271,7 +280,6 @@ export async function POST(request: NextRequest) {
       })
     } else {
       unlock.totalOrders++
-
       if (unlock.currentLevel < 3 && unlock.nextUnlockAt && now >= unlock.nextUnlockAt) {
         unlock.currentLevel++
         const nextLevelConfig = QUANTITY_LEVELS.find((l) => l.level === unlock!.currentLevel + 1)
@@ -285,22 +293,30 @@ export async function POST(request: NextRequest) {
           unlock.nextUnlockAt = new Date(now.getTime() + nextLevelConfig.unlockAfterHours * 3600000)
         }
       }
-
       await unlock.save()
     }
 
-    // 14. Dispatch to provider
-    dispatchToProvider(order._id, service._id, platform.slug, quantity, targetUrl).catch(
-      (err) => console.error("Provider dispatch error:", err)
+    // 15. Dispatch to provider (await so status is set before responding)
+    const dispatchResult = await dispatchOrder(
+      order._id,
+      service._id,
+      quantity,
+      targetUrl
     )
+
+    // 16. Re-fetch order to get updated status from dispatch
+    const updatedOrder = await Order.findById(order._id).lean()
 
     return NextResponse.json({
       success: true,
       data: {
         orderId: order._id,
         trackingId,
-        status: order.status,
-        message: "Order submitted successfully",
+        status: updatedOrder?.status || order.status,
+        providerOrderId: updatedOrder?.providerOrderId || null,
+        message: dispatchResult.success
+          ? "Order submitted and dispatched to provider"
+          : "Order submitted but provider dispatch failed. It will be retried.",
       },
     })
   } catch (error) {
@@ -309,86 +325,5 @@ export async function POST(request: NextRequest) {
       { success: false, error: "An unexpected error occurred" },
       { status: 500 }
     )
-  }
-}
-
-async function dispatchToProvider(
-  orderId: any,
-  serviceId: any,
-  platformSlug: string,
-  quantity: number,
-  targetUrl: string
-) {
-  try {
-    const providerService = await ProviderService.findOne({
-      serviceId,
-      isActive: true,
-      minQuantity: { $lte: quantity },
-      maxQuantity: { $gte: quantity },
-    }).populate("providerId")
-
-    if (!providerService) {
-      await Order.findByIdAndUpdate(orderId, {
-        status: "FAILED",
-        failureReason: "No provider available",
-        failedAt: new Date(),
-      })
-      return
-    }
-
-    const provider = providerService.providerId as any
-    if (!provider || !provider.isActive) {
-      await Order.findByIdAndUpdate(orderId, {
-        status: "FAILED",
-        failureReason: "Provider inactive",
-        failedAt: new Date(),
-      })
-      return
-    }
-
-    let apiKey: string
-    try {
-      apiKey = decrypt(provider.apiKey)
-    } catch {
-      apiKey = provider.apiKey
-    }
-
-    const panel = new SMMPanel({
-      apiUrl: provider.apiUrl,
-      apiKey,
-    })
-
-    const startTime = Date.now()
-    const result = await panel.addOrder(
-      parseInt(providerService.externalServiceId),
-      targetUrl,
-      quantity
-    )
-    const latencyMs = Date.now() - startTime
-
-    if (result.order) {
-      await Order.findByIdAndUpdate(orderId, {
-        providerId: provider._id,
-        providerServiceId: providerService._id,
-        providerOrderId: result.order.toString(),
-        providerResponse: result as any,
-        status: "PROVIDER_DISPATCHED",
-        latencyMs,
-      })
-    } else {
-      await Order.findByIdAndUpdate(orderId, {
-        status: "FAILED",
-        failureReason: result.error || "Provider rejected order",
-        failedAt: new Date(),
-        latencyMs,
-      })
-    }
-  } catch (error) {
-    console.error("Dispatch error:", error)
-    await Order.findByIdAndUpdate(orderId, {
-      status: "FAILED",
-      failureReason: error instanceof Error ? error.message : "Dispatch failed",
-      failedAt: new Date(),
-    })
   }
 }

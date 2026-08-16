@@ -1,84 +1,32 @@
 import { connectDB } from "./db"
 import { Provider, ProviderService, Order, SystemLog } from "./models"
 import { decrypt } from "./crypto"
-import { ProviderDispatchResult } from "@/types"
+import { SMMPanel } from "./smm-panel"
 import { Types } from "mongoose"
 
-interface ProviderOrderPayload {
-  service: string
-  quantity: number
-  url: string
+export interface ProviderDispatchResult {
+  success: boolean
+  providerId: string
+  externalOrderId?: string
+  rawResponse?: Record<string, unknown>
+  error?: string
+  latencyMs: number
 }
 
-async function callProviderApi(
-  apiUrl: string,
-  apiKey: string,
-  payload: ProviderOrderPayload,
-  timeoutMs: number
-): Promise<{ success: boolean; orderId?: string; response: Record<string, unknown>; error?: string }> {
-  const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), timeoutMs)
-
-  try {
-    const response = await fetch(apiUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        service: payload.service,
-        quantity: payload.quantity,
-        url: payload.url,
-      }),
-      signal: controller.signal,
-    })
-
-    const data = (await response.json()) as Record<string, unknown>
-
-    if (!response.ok) {
-      return {
-        success: false,
-        response: data,
-        error: (data.message as string) || `HTTP ${response.status}`,
-      }
-    }
-
-    // Common provider response formats
-    const orderId = (data.order_id || data.order || data.id || data.orderId) as string | undefined
-
-    return {
-      success: true,
-      orderId: orderId?.toString(),
-      response: data,
-    }
-  } catch (error) {
-    if (error instanceof Error && error.name === "AbortError") {
-      return {
-        success: false,
-        response: {},
-        error: "Request timeout",
-      }
-    }
-    return {
-      success: false,
-      response: {},
-      error: error instanceof Error ? error.message : "Unknown error",
-    }
-  } finally {
-    clearTimeout(timeout)
-  }
-}
-
+/**
+ * Dispatch an order to the best available provider.
+ * Uses the SMMPanel class for proper API format (URL-encoded form data).
+ * Updates the order record with provider details and status.
+ */
 export async function dispatchOrder(
-  orderId: Types.ObjectId,
-  serviceId: Types.ObjectId,
+  orderId: Types.ObjectId | string,
+  serviceId: Types.ObjectId | string,
   quantity: number,
   targetUrl: string
 ): Promise<ProviderDispatchResult> {
   await connectDB()
 
-  // Get active provider services sorted by priority
+  // Get active provider services for this service, sorted by priority
   const providerServices = await ProviderService.find({
     serviceId,
     isActive: true,
@@ -89,16 +37,14 @@ export async function dispatchOrder(
     .sort({ priority: -1 })
 
   if (providerServices.length === 0) {
-    await logEvent("error", "provider-engine", "No active providers found for service", {
-      serviceId,
-      quantity,
+    const reason = "No active provider services found for this service"
+    await Order.findByIdAndUpdate(orderId, {
+      status: "FAILED",
+      failureReason: reason,
+      failedAt: new Date(),
     })
-    return {
-      success: false,
-      providerId: "",
-      error: "No providers available",
-      latencyMs: 0,
-    }
+    await logEvent("error", "provider-engine", reason, { serviceId, quantity })
+    return { success: false, providerId: "", error: reason, latencyMs: 0 }
   }
 
   let lastError = ""
@@ -115,85 +61,103 @@ export async function dispatchOrder(
       maxRetries: number
     }
 
-    if (!provider) continue
-
-    const startTime = Date.now()
+    if (!provider || !provider.isActive) continue
 
     // Decrypt API key
     let apiKey: string
     try {
       apiKey = decrypt(provider.apiKey)
     } catch {
-      await logEvent("error", "provider-engine", "Failed to decrypt provider API key", {
-        providerId: provider._id,
-      })
-      continue
+      // Try using the key as-is if decryption fails (might be stored unencrypted)
+      apiKey = provider.apiKey
     }
 
+    const panel = new SMMPanel({
+      apiUrl: provider.apiUrl,
+      apiKey,
+    })
+
     // Retry logic
-    for (let attempt = 0; attempt <= provider.maxRetries; attempt++) {
+    const maxRetries = provider.maxRetries || 2
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
       const attemptStart = Date.now()
 
-      const result = await callProviderApi(
-        provider.apiUrl,
-        apiKey,
-        {
-          service: ps.externalServiceId,
-          quantity,
-          url: targetUrl,
-        },
-        provider.timeoutMs
-      )
+      try {
+        const result = await panel.addOrder(
+          parseInt(ps.externalServiceId),
+          targetUrl,
+          quantity
+        )
 
-      const attemptLatency = Date.now() - attemptStart
-      totalLatency += attemptLatency
+        const attemptLatency = Date.now() - attemptStart
+        totalLatency += attemptLatency
 
-      if (result.success && result.orderId) {
-        // Success - update order
-        await Order.findByIdAndUpdate(orderId, {
-          providerId: provider._id,
-          providerServiceId: ps._id,
-          providerOrderId: result.orderId,
-          providerResponse: result.response,
-          status: "PROVIDER_DISPATCHED",
-          latencyMs: totalLatency,
-        })
+        if (result.order) {
+          // Success — update order with provider details
+          await Order.findByIdAndUpdate(orderId, {
+            providerId: provider._id,
+            providerServiceId: ps._id,
+            providerOrderId: result.order.toString(),
+            providerResponse: result as unknown as Record<string, unknown>,
+            status: "PROVIDER_DISPATCHED",
+            latencyMs: totalLatency,
+          })
 
-        await logEvent("info", "provider-engine", "Order dispatched successfully", {
+          await logEvent("info", "provider-engine", "Order dispatched successfully", {
+            orderId,
+            providerId: provider._id,
+            providerName: provider.name,
+            providerServiceId: ps._id,
+            externalServiceId: ps.externalServiceId,
+            providerOrderId: result.order.toString(),
+            attempt: attempt + 1,
+            latencyMs: attemptLatency,
+          })
+
+          return {
+            success: true,
+            providerId: provider._id.toString(),
+            externalOrderId: result.order.toString(),
+            rawResponse: result as unknown as Record<string, unknown>,
+            latencyMs: totalLatency,
+          }
+        }
+
+        // Provider returned no order ID — treat as failure
+        lastError = result.error || "Provider returned no order ID"
+
+        await logEvent("warn", "provider-engine", `Provider attempt ${attempt + 1} failed`, {
           orderId,
           providerId: provider._id,
-          providerOrderId: result.orderId,
+          providerName: provider.name,
           attempt: attempt + 1,
+          error: lastError,
+          response: result as unknown as Record<string, unknown>,
           latencyMs: attemptLatency,
         })
+      } catch (error) {
+        const attemptLatency = Date.now() - attemptStart
+        totalLatency += attemptLatency
+        lastError = error instanceof Error ? error.message : "Unknown error"
 
-        return {
-          success: true,
-          providerId: provider._id.toString(),
-          externalOrderId: result.orderId,
-          rawResponse: result.response,
-          latencyMs: totalLatency,
-        }
+        await logEvent("warn", "provider-engine", `Provider attempt ${attempt + 1} error`, {
+          orderId,
+          providerId: provider._id,
+          providerName: provider.name,
+          attempt: attempt + 1,
+          error: lastError,
+          latencyMs: attemptLatency,
+        })
       }
 
-      lastError = result.error || "Unknown error"
-
-      await logEvent("warn", "provider-engine", `Provider attempt ${attempt + 1} failed`, {
-        orderId,
-        providerId: provider._id,
-        attempt: attempt + 1,
-        error: lastError,
-        latencyMs: attemptLatency,
-      })
-
       // Wait before retry (exponential backoff)
-      if (attempt < provider.maxRetries) {
+      if (attempt < maxRetries) {
         await new Promise((resolve) => setTimeout(resolve, Math.pow(2, attempt) * 1000))
       }
     }
 
     // This provider failed all attempts, try next
-    lastError = `Provider ${provider.name} failed: ${lastError}`
+    lastError = `Provider ${provider.name} failed after ${maxRetries + 1} attempts: ${lastError}`
   }
 
   // All providers failed
@@ -211,12 +175,7 @@ export async function dispatchOrder(
     totalLatency,
   })
 
-  return {
-    success: false,
-    providerId: "",
-    error: lastError,
-    latencyMs: totalLatency,
-  }
+  return { success: false, providerId: "", error: lastError, latencyMs: totalLatency }
 }
 
 async function logEvent(
@@ -226,12 +185,7 @@ async function logEvent(
   metadata: Record<string, unknown> = {}
 ) {
   try {
-    await SystemLog.create({
-      level,
-      category,
-      message,
-      metadata,
-    })
+    await SystemLog.create({ level, category, message, metadata })
   } catch (error) {
     console.error("Failed to log event:", error)
   }

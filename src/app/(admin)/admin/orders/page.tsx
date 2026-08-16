@@ -134,13 +134,13 @@ export default function AdminOrdersPage() {
             <table className="w-full">
               <thead>
                 <tr className="border-b">
-                  <th className="text-left p-4 font-medium">Order</th>
+                  <th className="text-left p-4 font-medium">Tracking ID</th>
                   <th className="text-left p-4 font-medium">User</th>
                   <th className="text-left p-4 font-medium">Service</th>
+                  <th className="text-left p-4 font-medium">Link</th>
                   <th className="text-left p-4 font-medium">Qty</th>
                   <th className="text-left p-4 font-medium">Provider</th>
                   <th className="text-left p-4 font-medium">Status</th>
-                  <th className="text-left p-4 font-medium">Latency</th>
                   <th className="text-left p-4 font-medium">Created</th>
                   <th className="text-left p-4 font-medium">Actions</th>
                 </tr>
@@ -167,15 +167,25 @@ export default function AdminOrdersPage() {
                     <>
                       <tr key={order._id} className="border-b hover:bg-muted/50">
                         <td className="p-4">
-                          <div className="font-mono text-xs">{order.requestId.slice(0, 8)}...</div>
+                          <div className="font-mono text-xs font-semibold">{order.trackingId || order.requestId?.slice(0, 8)}</div>
                         </td>
                         <td className="p-4">
-                          <div className="text-sm">{order.userId?.username}</div>
-                          <div className="text-xs text-muted-foreground">{order.userId?.email}</div>
+                          <div className="text-sm">{order.userId?.username || "Guest"}</div>
+                          <div className="text-xs text-muted-foreground">{order.userId?.email || "-"}</div>
                         </td>
                         <td className="p-4">
                           <div className="text-sm">{order.serviceId?.name}</div>
                           <div className="text-xs text-muted-foreground">{order.platformId?.name}</div>
+                        </td>
+                        <td className="p-4 max-w-[200px] truncate">
+                          <a
+                            href={order.targetUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs text-violet-600 hover:underline"
+                          >
+                            {order.targetUrl?.replace(/^https?:\/\/(www\.)?/, "").slice(0, 30)}...
+                          </a>
                         </td>
                         <td className="p-4">{order.quantity}</td>
                         <td className="p-4">
@@ -187,9 +197,6 @@ export default function AdminOrdersPage() {
                           )}
                         </td>
                         <td className="p-4">{getStatusBadge(order.status)}</td>
-                        <td className="p-4">
-                          {order.latencyMs ? `${order.latencyMs}ms` : "-"}
-                        </td>
                         <td className="p-4 text-sm">
                           {formatDateTime(order.createdAt)}
                         </td>

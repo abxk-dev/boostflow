@@ -196,22 +196,28 @@ export async function POST(request: NextRequest) {
     user.dailyOrderCount += 1
     await user.save()
 
-    // Dispatch to provider asynchronously
-    dispatchOrder(
+    // Dispatch to provider and await result
+    const dispatchResult = await dispatchOrder(
       order._id,
       service._id,
       validatedData.quantity,
       validatedData.targetUrl
-    ).catch((error) => {
-      console.error("Provider dispatch error:", error)
-    })
+    )
+
+    // Re-fetch order to get updated status
+    const updatedOrder = await Order.findById(order._id).lean()
 
     return NextResponse.json({
       success: true,
       data: {
         orderId: order._id,
-        status: order.status,
-        message: "Order submitted successfully",
+        trackingId: updatedOrder?.trackingId || order.trackingId,
+        status: updatedOrder?.status || order.status,
+        providerOrderId: updatedOrder?.providerOrderId || null,
+        message: dispatchResult.success
+          ? "Order submitted and dispatched to provider"
+          : "Order submitted but provider dispatch failed",
+      },
       },
     })
   } catch (error) {
